@@ -1,3 +1,4 @@
+import bcrypt
 from flask import Flask, jsonify, request
 from models.user import User
 from databese import db
@@ -5,7 +6,7 @@ from flask_login import LoginManager, current_user, login_required, login_user, 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://admin:admin123@localhost:3306/flask-crud'
 
 login_manager = LoginManager()
 
@@ -28,7 +29,7 @@ def login():
     if (username or email) and password:
         user = User.query.filter((User.username == username) | (User.email == email)).first()
 
-        if user and user.password == password:
+        if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
             login_user(user)
             print(current_user.is_authenticated)
             return jsonify({'message': 'Login successful'})
@@ -42,7 +43,6 @@ def logout():
     return jsonify({'message': 'Logout successful'})
 
 @app.route('/user', methods=['POST'])
-@login_required
 def create_user():
     data = request.json
     username = data.get('username')
@@ -53,8 +53,9 @@ def create_user():
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
         if existing_user:
             return jsonify({'message': 'Username or email already exists'}), 400
-
-        new_user = User(username=username, email=email, password=password)
+        
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        new_user = User(username=username, email=email, password=hashed_password, role='user')
         db.session.add(new_user)
         db.session.commit()
         return jsonify({'message': 'User created successfully'})
@@ -73,6 +74,9 @@ def read_user(id):
 @login_required
 def update_user(id):
     user = User.query.get(id)
+    if id != current_user.id and current_user.role != 'admin':
+        return jsonify({'message': 'You can only update your own account'}), 403
+    
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
@@ -89,10 +93,12 @@ def update_user(id):
 @login_required
 def delete_user(id):
     user = User.query.get(id)
+    if current_user.role != 'admin' and id != current_user.id:
+        return jsonify({'message': 'You can only delete your own account'}), 403
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
-    if id == current_user.id:
+    if id != current_user.id:
         return jsonify({'message': 'You can only delete your own account'}), 403
 
     db.session.delete(user)
