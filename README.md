@@ -49,7 +49,7 @@ Entre os principais conceitos trabalhados estão:
 
 Abaixo está uma visão do projeto desenvolvido durante os estudos:
 
-![Demonstração do projeto](./assets/) -->  em breve 
+![Demonstração do projeto](./assets/DevLinks.png)
 
 ---
 
